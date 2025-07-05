@@ -1,0 +1,254 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(220, 13%, 9%);
+  --foreground: hsl(220, 9%, 98%);
+  --muted: hsl(220, 14%, 11%);
+  --muted-foreground: hsl(220, 9%, 46%);
+  --popover: hsl(220, 13%, 9%);
+  --popover-foreground: hsl(220, 9%, 98%);
+  --card: hsl(220, 13%, 12%);
+  --card-foreground: hsl(220, 9%, 98%);
+  --border: hsl(220, 13%, 18%);
+  --input: hsl(220, 13%, 18%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(220, 14%, 11%);
+  --secondary-foreground: hsl(220, 9%, 98%);
+  --accent: hsl(220, 14%, 11%);
+  --accent-foreground: hsl(220, 9%, 98%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(220, 91%, 75%);
+  --radius: 0.5rem;
+  --success: hsl(142, 71%, 45%);
+  --warning: hsl(38, 92%, 50%);
+  --error: hsl(0, 84%, 60%);
+  --info: hsl(207, 90%, 54%);
+}
+
+.dark {
+  --background: hsl(220, 13%, 9%);
+  --foreground: hsl(220, 9%, 98%);
+  --muted: hsl(220, 14%, 11%);
+  --muted-foreground: hsl(220, 9%, 46%);
+  --popover: hsl(220, 13%, 9%);
+  --popover-foreground: hsl(220, 9%, 98%);
+  --card: hsl(220, 13%, 12%);
+  --card-foreground: hsl(220, 9%, 98%);
+  --border: hsl(220, 13%, 18%);
+  --input: hsl(220, 13%, 18%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(220, 14%, 11%);
+  --secondary-foreground: hsl(220, 9%, 98%);
+  --accent: hsl(220, 14%, 11%);
+  --accent-foreground: hsl(220, 9%, 98%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(220, 91%, 75%);
+  --radius: 0.5rem;
+  --success: hsl(142, 71%, 45%);
+  --warning: hsl(38, 92%, 50%);
+  --error: hsl(0, 84%, 60%);
+  --info: hsl(207, 90%, 54%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Custom styles for the logistics platform */
+.truck-marker {
+  background: transparent;
+  border: none;
+}
+
+.status-online {
+  color: hsl(142, 71%, 45%);
+}
+
+.status-offline {
+  color: hsl(0, 84%, 60%);
+}
+
+.status-idle {
+  color: hsl(38, 92%, 50%);
+}
+
+.status-maintenance {
+  color: hsl(207, 90%, 54%);
+}
+
+.alert-critical {
+  border-left: 4px solid hsl(0, 84%, 60%);
+}
+
+.alert-high {
+  border-left: 4px solid hsl(38, 92%, 50%);
+}
+
+.alert-medium {
+  border-left: 4px solid hsl(207, 90%, 54%);
+}
+
+.alert-low {
+  border-left: 4px solid hsl(142, 71%, 45%);
+}
+
+/* Camera feed styles */
+.camera-feed {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background-color: hsl(220, 13%, 9%);
+}
+
+.camera-feed::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.1) 50%, transparent 60%);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Map styles */
+.leaflet-container {
+  background: hsl(220, 13%, 9%) !important;
+}
+
+.leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.1);
+}
+
+/* Sidebar active state */
+.sidebar-active {
+  background-color: hsl(207, 90%, 54%);
+  color: hsl(210, 40%, 98%);
+}
+
+/* Status indicators */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-indicator.online {
+  background-color: hsl(142, 71%, 45%, 0.1);
+  color: hsl(142, 71%, 45%);
+}
+
+.status-indicator.offline {
+  background-color: hsl(0, 84%, 60%, 0.1);
+  color: hsl(0, 84%, 60%);
+}
+
+.status-indicator.idle {
+  background-color: hsl(38, 92%, 50%, 0.1);
+  color: hsl(38, 92%, 50%);
+}
+
+.status-indicator.maintenance {
+  background-color: hsl(207, 90%, 54%, 0.1);
+  color: hsl(207, 90%, 54%);
+}
+
+/* KPI score colors */
+.kpi-excellent {
+  color: hsl(142, 71%, 45%);
+}
+
+.kpi-good {
+  color: hsl(60, 100%, 50%);
+}
+
+.kpi-average {
+  color: hsl(38, 92%, 50%);
+}
+
+.kpi-poor {
+  color: hsl(0, 84%, 60%);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/* Loading states */
+.loading-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Hover effects */
+.hover-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Alert animations */
+.alert-pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(220, 13%, 9%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(220, 13%, 18%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(220, 13%, 25%);
+}
