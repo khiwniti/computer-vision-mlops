@@ -8,13 +8,18 @@ import {
   Building, 
   Shield, 
   TrendingUp, 
-  AlertTriangle 
+  AlertTriangle,
+  Brain,
+  Navigation
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: TrendingUp },
+  { name: "Live Monitoring", href: "/live-monitoring", icon: Video },
+  { name: "GPS Tracking", href: "/gps-tracking", icon: Navigation },
   { name: "Live Tracking", href: "/live-tracking", icon: MapPin },
   { name: "CCTV Monitor", href: "/cctv-monitor", icon: Video },
+  { name: "Video Analytics", href: "/video-analytics", icon: Brain },
   { name: "Drivers", href: "/drivers", icon: Users },
   { name: "Vendors", href: "/vendors", icon: Building },
   { name: "Geofences", href: "/geofences", icon: Shield },

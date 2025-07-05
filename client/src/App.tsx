@@ -12,6 +12,9 @@ import Vendors from "@/pages/vendors";
 import Geofences from "@/pages/geofences";
 import Analytics from "@/pages/analytics";
 import Alerts from "@/pages/alerts";
+import VideoAnalytics from "@/pages/video-analytics";
+import LiveMonitoring from "@/pages/live-monitoring";
+import GpsTracking from "@/pages/gps-tracking";
 import Sidebar from "@/components/layout/sidebar";
 
 function Router() {
@@ -22,12 +25,15 @@ function Router() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/live-tracking" component={LiveTracking} />
+          <Route path="/gps-tracking" component={GpsTracking} />
           <Route path="/cctv-monitor" component={CCTVMonitor} />
           <Route path="/drivers" component={Drivers} />
           <Route path="/vendors" component={Vendors} />
           <Route path="/geofences" component={Geofences} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/alerts" component={Alerts} />
+          <Route path="/video-analytics" component={VideoAnalytics} />
+          <Route path="/live-monitoring" component={LiveMonitoring} />
           <Route component={NotFound} />
         </Switch>
       </main>

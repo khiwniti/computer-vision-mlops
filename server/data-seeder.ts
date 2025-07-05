@@ -1,7 +1,8 @@
 import { storage } from "./storage";
-import { 
-  insertTruckSchema, insertDriverSchema, insertVendorSchema, 
-  insertCameraSchema, insertGeofenceSchema, insertAlertSchema 
+import {
+  insertTruckSchema, insertDriverSchema, insertVendorSchema,
+  insertCameraSchema, insertGeofenceSchema, insertAlertSchema,
+  insertShipmentSchema, insertShipmentTruckSchema
 } from "@shared/schema";
 
 export async function seedData() {
@@ -90,7 +91,8 @@ export async function seedData() {
       'Hunter Owens', 'Olivia Reynolds', 'Connor Harper', 'Zoe Fisher', 'Landon Ellis'
     ];
 
-    for (let i = 0; i < 100; i++) {
+    // Seed 50 drivers (5 shipments × 10 drivers each)
+    for (let i = 0; i < 50; i++) {
       const name = driverNames[i] || `Driver ${i + 1}`;
       await storage.createDriver({
         name,
@@ -105,7 +107,7 @@ export async function seedData() {
       });
     }
 
-    // Seed trucks
+    // Seed trucks (50 trucks for 5 shipments of 10 trucks each)
     const statuses = ['online', 'offline', 'idle', 'maintenance'];
     const locations = [
       'Highway 45, Mile 23', 'Interstate 95, Exit 42', 'Route 66, Mile 154',
@@ -114,7 +116,7 @@ export async function seedData() {
       'Highway 90, Mile 234', 'Interstate 10, Mile 345', 'Route 50, Mile 456'
     ];
 
-    for (let i = 1; i <= 100; i++) {
+    for (let i = 1; i <= 50; i++) {
       const status = statuses[Math.floor(Math.random() * statuses.length)];
       const latitude = 40.7128 + (Math.random() - 0.5) * 0.5;
       const longitude = -74.0060 + (Math.random() - 0.5) * 0.5;
@@ -135,13 +137,82 @@ export async function seedData() {
 
     // Seed cameras for each truck
     const positions = ['front', 'back', 'left', 'right'];
-    for (let truckId = 1; truckId <= 100; truckId++) {
+    for (let truckId = 1; truckId <= 50; truckId++) {
       for (const position of positions) {
         await storage.createCamera({
           truckId,
           position,
           streamUrl: `rtsp://camera${truckId}-${position}.stream.com/live`,
           status: Math.random() > 0.05 ? 'online' : 'offline'
+        });
+      }
+    }
+
+    // Seed shipments (5 shipments with 10 trucks each)
+    const customers = [
+      'ABC Construction Corp', 'Metro Building Solutions', 'Urban Development Inc',
+      'Skyline Contractors', 'Foundation Masters LLC'
+    ];
+    
+    const origins = [
+      'Central Depot - 123 Industrial Blvd', 'North Terminal - 456 Warehouse St',
+      'East Hub - 789 Logistics Ave', 'West Facility - 321 Distribution Way',
+      'South Station - 654 Supply Chain Dr'
+    ];
+    
+    const destinations = [
+      'Downtown Construction Site - 100 Main St', 'Suburban Development - 200 Oak Ave',
+      'Highway Expansion Project - Mile 45', 'Airport Runway Extension - Terminal B',
+      'Bridge Renovation - River Crossing'
+    ];
+
+    for (let i = 1; i <= 5; i++) {
+      const plannedDeparture = new Date();
+      plannedDeparture.setHours(plannedDeparture.getHours() + (i * 2)); // Stagger departures
+      
+      const plannedArrival = new Date(plannedDeparture);
+      plannedArrival.setHours(plannedArrival.getHours() + 4); // 4 hour journey
+      
+      const shipment = await storage.createShipment({
+        shipmentNumber: `SHP-${String(i).padStart(4, '0')}`,
+        customerName: customers[i - 1],
+        origin: origins[i - 1],
+        destination: destinations[i - 1],
+        plannedDeparture,
+        plannedArrival,
+        status: i <= 2 ? 'in_progress' : i === 3 ? 'completed' : 'planned',
+        priority: i === 1 ? 'urgent' : i === 2 ? 'high' : 'medium',
+        totalTrucks: 10,
+        activeTrucks: i <= 2 ? Math.floor(Math.random() * 8) + 2 : 0,
+        completedTrucks: i === 3 ? 10 : i <= 2 ? Math.floor(Math.random() * 3) : 0,
+        estimatedDistance: 45.5 + (Math.random() * 20),
+        notes: `Shipment ${i} - ${customers[i - 1]} delivery`
+      });
+
+      // Assign 10 trucks to each shipment
+      const startTruckId = (i - 1) * 10 + 1;
+      for (let j = 0; j < 10; j++) {
+        const truckId = startTruckId + j;
+        const driverId = truckId;
+        
+        let truckStatus = 'assigned';
+        if (i <= 2) { // Active shipments
+          const statuses = ['departed', 'in_transit', 'arrived'];
+          truckStatus = statuses[Math.floor(Math.random() * statuses.length)];
+        } else if (i === 3) { // Completed shipment
+          truckStatus = 'completed';
+        }
+        
+        await storage.createShipmentTruck({
+          shipmentId: i,
+          truckId,
+          driverId,
+          position: j + 1,
+          status: truckStatus,
+          departureTime: truckStatus !== 'assigned' ? plannedDeparture : null,
+          arrivalTime: truckStatus === 'completed' || truckStatus === 'arrived' ? plannedArrival : null,
+          currentDistance: truckStatus !== 'assigned' ? Math.floor(Math.random() * 45) : 0,
+          estimatedArrival: truckStatus === 'in_transit' ? new Date(Date.now() + Math.random() * 3600000 * 2) : null
         });
       }
     }

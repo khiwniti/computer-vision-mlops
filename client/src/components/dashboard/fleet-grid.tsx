@@ -7,22 +7,23 @@ import { Search, Eye, Video } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import TruckCard from "@/components/ui/truck-card";
+import type { Truck } from "@/lib/api-types";
 
 export default function FleetGrid() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: trucks, isLoading } = useQuery({
+  const { data: trucks, isLoading } = useQuery<Truck[]>({
     queryKey: ['/api/trucks'],
     refetchInterval: 10000,
   });
 
-  const filteredTrucks = trucks?.filter((truck: any) => {
+  const filteredTrucks = (trucks || []).filter((truck: Truck) => {
     const matchesSearch = truck.truckNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          truck.location?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || truck.status === statusFilter;
     return matchesSearch && matchesStatus;
-  }) || [];
+  });
 
   if (isLoading) {
     return (
@@ -86,13 +87,13 @@ export default function FleetGrid() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredTrucks.map((truck: any) => (
+          {filteredTrucks.map((truck: Truck) => (
             <TruckCard key={truck.id} truck={truck} />
           ))}
         </div>
         <div className="mt-6 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {filteredTrucks.length} of {trucks?.length || 0} trucks
+            Showing {filteredTrucks.length} of {(trucks || []).length} trucks
           </p>
           <div className="flex items-center space-x-2">
             <Button variant="outline" size="sm">

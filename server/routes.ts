@@ -2,10 +2,12 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import videoRoutes from "./vss-integration/video-routes.js";
 import { 
   insertTruckSchema, insertDriverSchema, insertVendorSchema, 
   insertCameraSchema, insertGeofenceSchema, insertAlertSchema, insertTripSchema 
 } from "@shared/schema";
+import { ZodError } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -35,6 +37,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
+  // Error handling middleware for validation
+  const handleValidationError = (error: unknown) => {
+    if (error instanceof ZodError) {
+      return {
+        message: 'Validation error',
+        errors: error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message
+        }))
+      };
+    }
+    return { message: 'Invalid data provided' };
+  };
+
+  // Async route wrapper for error handling
+  const asyncRoute = (fn: Function) => (req: any, res: any, next: any) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+
+  // Validate numeric ID parameter
+  const validateId = (id: string) => {
+    const numId = parseInt(id);
+    if (isNaN(numId) || numId <= 0) {
+      throw new Error('Invalid ID parameter');
+    }
+    return numId;
+  };
+
   // Truck routes
   app.get('/api/trucks', async (req, res) => {
     try {
@@ -45,28 +75,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/trucks/:id', async (req, res) => {
+  app.get('/api/trucks/:id', asyncRoute(async (req: any, res: any) => {
     try {
-      const truck = await storage.getTruck(parseInt(req.params.id));
+      const id = validateId(req.params.id);
+      const truck = await storage.getTruck(id);
       if (!truck) {
         return res.status(404).json({ message: 'Truck not found' });
       }
       res.json(truck);
     } catch (error) {
+      if (error instanceof Error && error.message === 'Invalid ID parameter') {
+        return res.status(400).json({ message: 'Invalid truck ID' });
+      }
+      console.error('Error fetching truck:', error);
       res.status(500).json({ message: 'Failed to fetch truck' });
     }
-  });
+  }));
 
-  app.post('/api/trucks', async (req, res) => {
+  app.post('/api/trucks', asyncRoute(async (req: any, res: any) => {
     try {
       const validatedData = insertTruckSchema.parse(req.body);
       const truck = await storage.createTruck(validatedData);
       broadcast({ type: 'truck_created', data: truck });
       res.status(201).json(truck);
     } catch (error) {
-      res.status(400).json({ message: 'Invalid truck data' });
+      if (error instanceof ZodError) {
+        return res.status(400).json(handleValidationError(error));
+      }
+      console.error('Error creating truck:', error);
+      res.status(500).json({ message: 'Failed to create truck' });
     }
-  });
+  }));
 
   app.patch('/api/trucks/:id', async (req, res) => {
     try {
@@ -262,6 +301,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to fetch dashboard stats' });
     }
   });
+
+  // Video analytics routes
+  app.use('/api/video', videoRoutes);
+
+  // Streaming API routes
+  const streamRoutes = await import('./streaming-api/stream-routes.js');
+  app.use('/api/streams', streamRoutes.default);
+
+  // GPS tracking routes
+  const gpsRoutes = await import('./gps/gps-routes.js');
+  app.use('/api/gps', gpsRoutes.default);
+
+  // Predictive analytics routes
+  const analyticsRoutes = await import('./analytics/analytics-routes.js');
+  app.use('/api/analytics', analyticsRoutes.default);
+
+  // Mock data and simulation routes
+  const mockRoutes = await import('./mock-data/mock-api-routes.js');
+  app.use('/api/mock', mockRoutes.default);
 
   return httpServer;
 }

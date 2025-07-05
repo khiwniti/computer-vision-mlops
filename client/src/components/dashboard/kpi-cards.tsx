@@ -1,12 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Truck, AlertTriangle, UserCheck, Bell } from "lucide-react";
+import { Truck, AlertTriangle, UserCheck, Bell, LucideIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { DashboardStats } from "@/lib/api-types";
 
 interface KPICardProps {
   title: string;
   value: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   trend: string;
   trendDirection: "up" | "down";
   color: "success" | "error" | "info" | "warning";
@@ -51,7 +52,7 @@ function KPICard({ title, value, icon: Icon, trend, trendDirection, color }: KPI
 }
 
 export default function KPICards() {
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
     refetchInterval: 30000,
   });
@@ -81,7 +82,7 @@ export default function KPICards() {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <KPICard
         title="Active Trucks"
-        value={stats?.activeTrucks?.toString() || "0"}
+        value={(stats?.activeTrucks ?? 0).toString()}
         icon={Truck}
         trend="+2.3% from yesterday"
         trendDirection="up"
@@ -89,7 +90,7 @@ export default function KPICards() {
       />
       <KPICard
         title="Offline Trucks"
-        value={stats?.offlineTrucks?.toString() || "0"}
+        value={(stats?.offlineTrucks ?? 0).toString()}
         icon={AlertTriangle}
         trend="-1.2% from yesterday"
         trendDirection="down"
@@ -97,7 +98,7 @@ export default function KPICards() {
       />
       <KPICard
         title="Active Drivers"
-        value={stats?.activeDrivers?.toString() || "0"}
+        value={(stats?.activeDrivers ?? 0).toString()}
         icon={UserCheck}
         trend="+0.8% from yesterday"
         trendDirection="up"
@@ -105,7 +106,7 @@ export default function KPICards() {
       />
       <KPICard
         title="Alerts Today"
-        value={stats?.todayAlerts?.toString() || "0"}
+        value={(stats?.todayAlerts ?? 0).toString()}
         icon={Bell}
         trend="-15.4% from yesterday"
         trendDirection="down"
