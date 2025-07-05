@@ -14,17 +14,25 @@ export function useWebSocket(url: string) {
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    // In development, always connect to the server port (5000)
+    let host: string;
+    if (import.meta.env.DEV) {
+      host = 'localhost:5000';
+    } else {
+      host = window.location.host || 'localhost:5000';
+    }
+    const wsUrl = `${protocol}//${host}/ws`;
     
     const connect = () => {
       try {
+        console.log(`Attempting to connect to WebSocket: ${wsUrl}`);
         const ws = new WebSocket(wsUrl);
         
         ws.onopen = () => {
           setIsConnected(true);
           setSocket(ws);
           reconnectAttempts.current = 0;
-          console.log("WebSocket connected");
+          console.log(`WebSocket connected to: ${wsUrl}`);
         };
 
         ws.onmessage = (event) => {

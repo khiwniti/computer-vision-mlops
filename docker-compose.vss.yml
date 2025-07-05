@@ -1,0 +1,181 @@
+# Docker Compose for AsphaltTracker + VSS Integration
+# This file extends the base AsphaltTracker deployment with VSS services
+
+version: '3.8'
+
+services:
+  # AsphaltTracker Application
+  asphalt-tracker:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - VSS_ENGINE_HOST=vss-engine
+      - VSS_ENGINE_PORT=8000
+      - VLM_ENDPOINT=http://vila-model:8001
+      - LLM_ENDPOINT=http://llama-model:8002
+      - EMBEDDING_ENDPOINT=http://embedding-model:8003
+      - RERANKER_ENDPOINT=http://reranker-model:8004
+      - VECTOR_DB_HOST=vector-db
+      - VECTOR_DB_PORT=8005
+      - GRAPH_DB_HOST=graph-db
+      - GRAPH_DB_PORT=7687
+    volumes:
+      - video-storage:/app/uploads/videos
+      - processed-storage:/app/data/processed
+    depends_on:
+      - vss-engine
+      - vector-db
+      - graph-db
+    networks:
+      - asphalt-network
+
+  # VSS Engine Service
+  vss-engine:
+    image: nvidia/vss-engine:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./vss-config:/app/config
+      - video-storage:/app/uploads
+      - processed-storage:/app/data
+    runtime: nvidia
+    depends_on:
+      - vila-model
+      - llama-model
+      - embedding-model
+      - reranker-model
+    networks:
+      - asphalt-network
+
+  # Vision Language Model (VILA)
+  vila-model:
+    image: nvcr.io/nvidia/vila:latest
+    ports:
+      - "8001:8001"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - MODEL_NAME=nvidia/vila
+    runtime: nvidia
+    shm_size: 1gb
+    networks:
+      - asphalt-network
+
+  # Large Language Model (Llama)
+  llama-model:
+    image: nvcr.io/nvidia/llama:latest
+    ports:
+      - "8002:8002"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=1,2,3,4
+      - MODEL_NAME=meta/llama-3.1-70b-instruct
+    runtime: nvidia
+    shm_size: 8gb
+    networks:
+      - asphalt-network
+
+  # Embedding Model
+  embedding-model:
+    image: nvcr.io/nvidia/embedding:latest
+    ports:
+      - "8003:8003"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=5
+      - MODEL_NAME=llama-3_2-nv-embedqa-1b-v2
+    runtime: nvidia
+    networks:
+      - asphalt-network
+
+  # Reranker Model
+  reranker-model:
+    image: nvcr.io/nvidia/reranker:latest
+    ports:
+      - "8004:8004"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=6
+      - MODEL_NAME=llama-3_2-nv-rerankqa-1b-v2
+    runtime: nvidia
+    networks:
+      - asphalt-network
+
+  # Vector Database (ChromaDB)
+  vector-db:
+    image: chromadb/chroma:latest
+    ports:
+      - "8005:8000"
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_PORT=8000
+    volumes:
+      - vector-db-data:/chroma/chroma
+    networks:
+      - asphalt-network
+
+  # Graph Database (Neo4j)
+  graph-db:
+    image: neo4j:latest
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - graph-db-data:/data
+    networks:
+      - asphalt-network
+
+  # Redis for caching
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - asphalt-network
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - asphalt-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    networks:
+      - asphalt-network
+
+volumes:
+  video-storage:
+  processed-storage:
+  vector-db-data:
+  graph-db-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  asphalt-network:
+    driver: bridge
