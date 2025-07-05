@@ -4,7 +4,33 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./database";
 
 const app = express();
-app.use(express.json());
+
+// Security and CORS for production
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+  
+  // CORS configuration
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || ['*'];
+    
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin || '')) {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+    }
+    
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS,PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+    } else {
+      next();
+    }
+  });
+}
+
+app.use(express.json({ limit: process.env.MAX_FILE_SIZE || '10mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
@@ -60,14 +86,16 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Use environment variables for Restack.io compatibility
+  const port = parseInt(process.env.PORT || "5000", 10);
+  const host = process.env.HOST || "0.0.0.0";
+  
   server.listen({
     port,
-    host: "0.0.0.0",
+    host,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`🚀 AsphaltTracker serving on ${host}:${port}`);
+    log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    log(`🔗 Health check: http://${host}:${port}/health`);
   });
 })();

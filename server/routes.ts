@@ -12,6 +12,27 @@ import { ZodError } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
+  // Health check endpoint for Restack.io
+  app.get("/health", (req, res) => {
+    res.status(200).json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      service: "asphalt-tracker",
+      version: "1.0.0",
+      uptime: process.uptime()
+    });
+  });
+
+  app.get("/api/health", (req, res) => {
+    res.status(200).json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      service: "asphalt-tracker-api",
+      version: "1.0.0",
+      uptime: process.uptime()
+    });
+  });
+  
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
