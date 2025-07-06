@@ -1,0 +1,198 @@
+# AsphaltTracker Enterprise Logistics Platform
+# Complete Docker Compose setup with infrastructure
+
+services:
+  # Main AsphaltTracker Application
+  asphalt-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: asphalt-tracker-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"   # Main application
+      - "5001:5001"   # WebSocket server
+      - "5233:5233"   # Restack dashboard
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - WS_PORT=5001
+      - RESTACK_PORT=5233
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=asphalt_tracker
+      - DB_USER=postgres
+      - DB_PASSWORD=asphalt_tracker_2024
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=asphalt_redis_2024
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - INFLUX_HOST=influxdb
+      - INFLUX_PORT=8086
+      - INFLUX_ORG=asphalt-tracker
+      - INFLUX_BUCKET=asphalt_metrics
+      - INFLUX_TOKEN=asphalt_influx_token_2024
+    volumes:
+      - app_uploads:/app/uploads
+      - app_data:/app/data
+      - app_logs:/app/logs
+      - app_backups:/app/backups
+    networks:
+      - asphalt-network
+    depends_on:
+      - postgres
+      - redis
+      - chromadb
+      - influxdb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: asphalt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: asphalt_tracker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: asphalt_tracker_2024
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - asphalt-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d asphalt_tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: asphalt-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass asphalt_redis_2024
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - asphalt-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ChromaDB Vector Database
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: asphalt-chromadb
+    restart: unless-stopped
+    environment:
+      CHROMA_SERVER_HOST: 0.0.0.0
+      CHROMA_SERVER_HTTP_PORT: 8000
+      ANONYMIZED_TELEMETRY: false
+      ALLOW_RESET: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    networks:
+      - asphalt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # InfluxDB Time Series Database
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: asphalt-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: asphalt_influx_2024
+      DOCKER_INFLUXDB_INIT_ORG: asphalt-tracker
+      DOCKER_INFLUXDB_INIT_BUCKET: asphalt_metrics
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: asphalt_influx_token_2024
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - asphalt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana for Monitoring (Optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: asphalt-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: asphalt_grafana_2024
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - asphalt-network
+    depends_on:
+      - postgres
+      - influxdb
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  chromadb_data:
+    driver: local
+  influxdb_data:
+    driver: local
+  influxdb_config:
+    driver: local
+  grafana_data:
+    driver: local
+  app_uploads:
+    driver: local
+  app_data:
+    driver: local
+  app_logs:
+    driver: local
+  app_backups:
+    driver: local
+
+networks:
+  asphalt-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

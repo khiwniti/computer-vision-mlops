@@ -29,7 +29,7 @@
     "dev:all": "node start-development.cjs",
     "dev:all:concurrent": "concurrently \"npm run dev\" \"npm run services\"",
     "build:all": "npm run build && npm run services:build",
-    "start:all": "concurrently \"npm run start\" \"npm run services:start\"",
+    "start:all": "node start-production.cjs",
     "start:all:concurrent": "concurrently \"npm run start\" \"npm run services:start\"",
     "start:app": "npm run start",
     "start:services-only": "npm run services:start",
@@ -45,8 +45,6 @@
   },
   "dependencies": {
     "@restackio/ai": "^0.0.126",
-    "axios": "^1.7.9",
-    "form-data": "^4.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@neondatabase/serverless": "^0.10.4",
     "@radix-ui/react-accordion": "^1.2.4",
