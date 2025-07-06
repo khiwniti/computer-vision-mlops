@@ -1,0 +1,282 @@
+# Docker Compose for AsphaltTracker + VSS Integration
+# This file extends the base AsphaltTracker deployment with VSS services
+
+version: '3.8'
+
+services:
+  # AsphaltTracker Application (Enhanced)
+  asphalt-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+      - "5001:5001"  # WebSocket port
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/asphalt_tracker
+      - REDIS_URL=redis://redis:6379
+      - VSS_ENGINE_HOST=vss-engine
+      - VSS_ENGINE_PORT=8000
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - VLM_ENDPOINT=http://vila-model:8001
+      - LLM_ENDPOINT=http://llama-model:8002
+      - EMBEDDING_ENDPOINT=http://embedding-model:8003
+      - RERANKER_ENDPOINT=http://reranker-model:8004
+      - ASR_ENDPOINT=http://asr-model:8005
+      - VECTOR_DB_HOST=vector-db
+      - VECTOR_DB_PORT=8000
+      - GRAPH_DB_HOST=graph-db
+      - GRAPH_DB_PORT=7687
+      - TSDB_HOST=influxdb
+      - TSDB_PORT=8086
+      - LOG_LEVEL=info
+      - FEATURE_REAL_TIME_PROCESSING=true
+      - FEATURE_ADVANCED_ANALYTICS=true
+      - FEATURE_SAFETY_MONITORING=true
+      - AI_CONFIDENCE_THRESHOLD=0.75
+    volumes:
+      - video-storage:/app/uploads/videos
+      - processed-storage:/app/data/processed
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+      - vss-engine
+      - vector-db
+      - graph-db
+      - influxdb
+      - prometheus
+    networks:
+      - asphalt-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=asphalt_tracker
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - asphalt-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # VSS Engine Service
+  vss-engine:
+    image: nvidia/vss-engine:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./vss-config:/app/config
+      - video-storage:/app/uploads
+      - processed-storage:/app/data
+    runtime: nvidia
+    depends_on:
+      - vila-model
+      - llama-model
+      - embedding-model
+      - reranker-model
+    networks:
+      - asphalt-network
+
+  # Vision Language Model (VILA)
+  vila-model:
+    image: nvcr.io/nvidia/vila:latest
+    ports:
+      - "8001:8001"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - MODEL_NAME=nvidia/vila
+    runtime: nvidia
+    shm_size: 1gb
+    networks:
+      - asphalt-network
+
+  # Large Language Model (Llama)
+  llama-model:
+    image: nvcr.io/nvidia/llama:latest
+    ports:
+      - "8002:8002"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=1,2,3,4
+      - MODEL_NAME=meta/llama-3.1-70b-instruct
+    runtime: nvidia
+    shm_size: 8gb
+    networks:
+      - asphalt-network
+
+  # Embedding Model
+  embedding-model:
+    image: nvcr.io/nvidia/embedding:latest
+    ports:
+      - "8003:8003"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=5
+      - MODEL_NAME=llama-3_2-nv-embedqa-1b-v2
+    runtime: nvidia
+    networks:
+      - asphalt-network
+
+  # Reranker Model
+  reranker-model:
+    image: nvcr.io/nvidia/reranker:latest
+    ports:
+      - "8004:8004"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=6
+      - MODEL_NAME=llama-3_2-nv-rerankqa-1b-v2
+    runtime: nvidia
+    networks:
+      - asphalt-network
+
+  # ASR Model for Audio Transcription
+  asr-model:
+    image: nvcr.io/nvidia/parakeet:latest
+    ports:
+      - "8005:8005"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=7
+      - MODEL_NAME=nvidia/parakeet-ctc-0_6b-asr
+    runtime: nvidia
+    networks:
+      - asphalt-network
+
+  # InfluxDB Time Series Database
+  influxdb:
+    image: influxdb:2.7
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=password
+      - DOCKER_INFLUXDB_INIT_ORG=asphalt-tracker
+      - DOCKER_INFLUXDB_INIT_BUCKET=activity-tracking
+      - DOCKER_INFLUXDB_INIT_RETENTION=30d
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - asphalt-network
+    restart: unless-stopped
+
+  # Vector Database (ChromaDB) - Enhanced
+  vector-db:
+    image: chromadb/chroma:latest
+    ports:
+      - "8007:8000"
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
+    volumes:
+      - vector-db-data:/chroma/chroma
+    networks:
+      - asphalt-network
+    restart: unless-stopped
+
+  # Graph Database (Neo4j) - Enhanced
+  graph-db:
+    image: neo4j:5.15
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+    volumes:
+      - graph-db-data:/data
+      - neo4j_logs:/logs
+    networks:
+      - asphalt-network
+    restart: unless-stopped
+
+  # Redis for caching - Enhanced
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - asphalt-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - asphalt-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    networks:
+      - asphalt-network
+
+volumes:
+  # Application data
+  video-storage:
+  processed-storage:
+
+  # Database volumes
+  postgres_data:
+  redis-data:
+  vector-db-data:
+  graph-db-data:
+  neo4j_logs:
+  influxdb_data:
+  influxdb_config:
+
+  # Monitoring volumes
+  prometheus-data:
+  grafana-data:
+
+networks:
+  asphalt-network:
+    driver: bridge

@@ -1,0 +1,44 @@
+# Grafana dashboard provisioning configuration for AsphaltTracker
+
+apiVersion: 1
+
+providers:
+  - name: 'AsphaltTracker Dashboards'
+    orgId: 1
+    folder: 'AsphaltTracker'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+
+  - name: 'AI Analytics Dashboards'
+    orgId: 1
+    folder: 'AI Analytics'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/ai
+
+  - name: 'Infrastructure Dashboards'
+    orgId: 1
+    folder: 'Infrastructure'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/infrastructure
+
+  - name: 'Safety Monitoring Dashboards'
+    orgId: 1
+    folder: 'Safety'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/safety

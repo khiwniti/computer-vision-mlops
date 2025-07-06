@@ -1,0 +1,276 @@
+# Prometheus configuration for AsphaltTracker Enhanced
+# Monitors application metrics, AI model performance, and system health
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'asphalt-tracker'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alert_rules.yml"
+  - "recording_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # AsphaltTracker main application
+  - job_name: 'asphalt-tracker'
+    static_configs:
+      - targets: ['asphalt-tracker:5000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    honor_labels: true
+    params:
+      format: ['prometheus']
+
+  # WebSocket server metrics
+  - job_name: 'asphalt-tracker-websocket'
+    static_configs:
+      - targets: ['asphalt-tracker:5001']
+    metrics_path: '/ws-metrics'
+    scrape_interval: 15s
+
+  # PostgreSQL database metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # ChromaDB vector database metrics
+  - job_name: 'chroma'
+    static_configs:
+      - targets: ['chroma:8000']
+    metrics_path: '/api/v1/metrics'
+    scrape_interval: 30s
+
+  # Neo4j graph database metrics
+  - job_name: 'neo4j'
+    static_configs:
+      - targets: ['neo4j:7474']
+    metrics_path: '/db/manage/server/jmx/domain/org.neo4j'
+    scrape_interval: 60s
+
+  # InfluxDB time series database metrics
+  - job_name: 'influxdb'
+    static_configs:
+      - targets: ['influxdb:8086']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # NVIDIA GPU metrics (if available)
+  - job_name: 'nvidia-gpu'
+    static_configs:
+      - targets: ['localhost:9400']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    honor_labels: true
+
+  # Node exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  # AI model performance metrics
+  - job_name: 'ai-models'
+    static_configs:
+      - targets: ['asphalt-tracker:5000']
+    metrics_path: '/ai-metrics'
+    scrape_interval: 30s
+    params:
+      module: ['ai_performance']
+
+  # Video processing metrics
+  - job_name: 'video-processing'
+    static_configs:
+      - targets: ['asphalt-tracker:5000']
+    metrics_path: '/video-metrics'
+    scrape_interval: 20s
+
+  # Stream manager metrics
+  - job_name: 'stream-manager'
+    static_configs:
+      - targets: ['asphalt-tracker:5000']
+    metrics_path: '/stream-metrics'
+    scrape_interval: 15s
+
+  # Safety monitoring metrics
+  - job_name: 'safety-monitoring'
+    static_configs:
+      - targets: ['asphalt-tracker:5000']
+    metrics_path: '/safety-metrics'
+    scrape_interval: 10s
+    honor_labels: true
+
+  # Activity tracking metrics
+  - job_name: 'activity-tracking'
+    static_configs:
+      - targets: ['asphalt-tracker:5000']
+    metrics_path: '/activity-metrics'
+    scrape_interval: 15s
+
+  # Alert manager metrics
+  - job_name: 'alert-manager'
+    static_configs:
+      - targets: ['asphalt-tracker:5000']
+    metrics_path: '/alert-metrics'
+    scrape_interval: 20s
+
+# Remote write configuration for long-term storage (optional)
+remote_write:
+  - url: "http://prometheus-remote-storage:9201/write"
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
+
+# Remote read configuration (optional)
+remote_read:
+  - url: "http://prometheus-remote-storage:9201/read"
+    read_recent: true
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB
+    wal-compression: true
+
+# Recording rules for aggregated metrics
+recording_rules:
+  - name: asphalt_tracker_aggregations
+    interval: 30s
+    rules:
+      - record: asphalt_tracker:request_rate_5m
+        expr: rate(http_requests_total[5m])
+      
+      - record: asphalt_tracker:error_rate_5m
+        expr: rate(http_requests_total{status=~"5.."}[5m])
+      
+      - record: asphalt_tracker:ai_processing_rate_5m
+        expr: rate(ai_processing_total[5m])
+      
+      - record: asphalt_tracker:video_processing_duration_p95
+        expr: histogram_quantile(0.95, rate(video_processing_duration_seconds_bucket[5m]))
+      
+      - record: asphalt_tracker:safety_alert_rate_1h
+        expr: rate(safety_alerts_total[1h])
+
+# Alert rules for critical conditions
+alert_rules:
+  - name: asphalt_tracker_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: asphalt_tracker:error_rate_5m > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors per second"
+
+      - alert: AIModelDown
+        expr: up{job="ai-models"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI model service is down"
+          description: "AI model service has been down for more than 2 minutes"
+
+      - alert: HighVideoProcessingLatency
+        expr: asphalt_tracker:video_processing_duration_p95 > 300
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High video processing latency"
+          description: "95th percentile processing time is {{ $value }} seconds"
+
+      - alert: SafetyAlertSpike
+        expr: asphalt_tracker:safety_alert_rate_1h > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual spike in safety alerts"
+          description: "Safety alert rate is {{ $value }} alerts per hour"
+
+      - alert: DatabaseConnectionDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection is down"
+          description: "PostgreSQL database is unreachable"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 90%"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80% for more than 10 minutes"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is below 10%"
+
+      - alert: StreamManagerDown
+        expr: up{job="stream-manager"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Stream manager is down"
+          description: "Video stream manager service is not responding"
+
+      - alert: CameraOffline
+        expr: camera_status{status="offline"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Camera offline"
+          description: "{{ $labels.camera_id }} has been offline for more than 5 minutes"

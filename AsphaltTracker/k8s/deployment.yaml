@@ -1,0 +1,306 @@
+# Kubernetes deployment configuration for AsphaltTracker Enhanced
+# Production-ready deployment with AI capabilities and monitoring
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asphalt-tracker
+  namespace: asphalt-tracker
+  labels:
+    app: asphalt-tracker
+    version: v2.0.0
+    component: application
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: asphalt-tracker
+  template:
+    metadata:
+      labels:
+        app: asphalt-tracker
+        version: v2.0.0
+        component: application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: asphalt-tracker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: asphalt-tracker
+        image: asphalt-tracker:v2.0.0
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 5000
+          protocol: TCP
+        - name: websocket
+          containerPort: 5001
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "5000"
+        - name: WS_PORT
+          value: "5001"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: asphalt-tracker-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: asphalt-tracker-secrets
+              key: redis-url
+        - name: NVIDIA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: asphalt-tracker-secrets
+              key: nvidia-api-key
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: asphalt-tracker-secrets
+              key: jwt-secret
+        - name: VECTOR_DB_HOST
+          value: "chroma-service"
+        - name: GRAPH_DB_HOST
+          value: "neo4j-service"
+        - name: TSDB_HOST
+          value: "influxdb-service"
+        - name: FEATURE_REAL_TIME_PROCESSING
+          value: "true"
+        - name: FEATURE_ADVANCED_ANALYTICS
+          value: "true"
+        - name: AI_CONFIDENCE_THRESHOLD
+          value: "0.75"
+        - name: MAX_CONCURRENT_PROCESSING
+          value: "10"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: video-storage
+          mountPath: /app/uploads/videos
+        - name: processed-data
+          mountPath: /app/data/processed
+        - name: logs
+          mountPath: /app/logs
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: video-storage
+        persistentVolumeClaim:
+          claimName: video-storage-pvc
+      - name: processed-data
+        persistentVolumeClaim:
+          claimName: processed-data-pvc
+      - name: logs
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: asphalt-tracker-config
+      nodeSelector:
+        node-type: compute
+      tolerations:
+      - key: "ai-workload"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - asphalt-tracker
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: asphalt-tracker-service
+  namespace: asphalt-tracker
+  labels:
+    app: asphalt-tracker
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "5000"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 5000
+    protocol: TCP
+  - name: websocket
+    port: 5001
+    targetPort: 5001
+    protocol: TCP
+  selector:
+    app: asphalt-tracker
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: asphalt-tracker-loadbalancer
+  namespace: asphalt-tracker
+  labels:
+    app: asphalt-tracker
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: 5000
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 5000
+    protocol: TCP
+  - name: websocket
+    port: 5001
+    targetPort: 5001
+    protocol: TCP
+  selector:
+    app: asphalt-tracker
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asphalt-tracker-config
+  namespace: asphalt-tracker
+data:
+  app.conf: |
+    # AsphaltTracker Application Configuration
+    LOG_LEVEL=info
+    MAX_FILE_SIZE=500MB
+    VIDEO_RETENTION_DAYS=90
+    SAFETY_PPE_COMPLIANCE=0.95
+    SAFETY_PROXIMITY_DISTANCE=5
+    PROGRESS_QUALITY_THRESHOLD=0.8
+    EQUIPMENT_UTILIZATION_THRESHOLD=0.7
+    ALERT_DUPLICATE_WINDOW=300
+    BACKUP_ENABLED=true
+    PERFORMANCE_MONITORING=true
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: asphalt-tracker-secrets
+  namespace: asphalt-tracker
+type: Opaque
+data:
+  # Base64 encoded secrets (replace with actual values)
+  database-url: cG9zdGdyZXNxbDovL3VzZXI6cGFzc3dvcmRAcG9zdGdyZXM6NTQzMi9hc3BoYWx0X3RyYWNrZXI=
+  redis-url: cmVkaXM6Ly9yZWRpczozNjc5
+  nvidia-api-key: eW91cl9udmlkaWFfYXBpX2tleV9oZXJl
+  jwt-secret: eW91cl9qd3Rfc2VjcmV0X2hlcmU=
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: video-storage-pvc
+  namespace: asphalt-tracker
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: processed-data-pvc
+  namespace: asphalt-tracker
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: asphalt-tracker
+  namespace: asphalt-tracker
+  labels:
+    app: asphalt-tracker
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: asphalt-tracker
+  name: asphalt-tracker-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: asphalt-tracker-rolebinding
+  namespace: asphalt-tracker
+subjects:
+- kind: ServiceAccount
+  name: asphalt-tracker
+  namespace: asphalt-tracker
+roleRef:
+  kind: Role
+  name: asphalt-tracker-role
+  apiGroup: rbac.authorization.k8s.io
