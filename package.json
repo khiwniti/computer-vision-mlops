@@ -18,9 +18,14 @@
     "mock:status": "curl -s http://localhost:5000/api/mock/status",
     "streaming:health": "curl -s http://localhost:5000/api/streams/health",
     "streaming:status": "curl -s http://localhost:5000/api/streams/status",
-    "streaming:init": "curl -s -X POST http://localhost:5000/api/streams/initialize"
+    "streaming:init": "curl -s -X POST http://localhost:5000/api/streams/initialize",
+    "restack:check": "curl -s http://localhost:5000/api/restack/status",
+    "restack:health": "curl -f http://localhost:5000/health | grep '@restackio/ai' || exit 1",
+    "restack:validate": "node -e 'console.log(\"✅ Restack AI dependency found:\", require(\"./package.json\").dependencies[\"@restackio/ai\"])'",
+    "test:restack": "npm run restack:validate && npm run health && npm run restack:check"
   },
   "dependencies": {
+    "@restackio/ai": "^0.2.0",
     "@hookform/resolvers": "^3.10.0",
     "@neondatabase/serverless": "^0.10.4",
     "@radix-ui/react-accordion": "^1.2.4",

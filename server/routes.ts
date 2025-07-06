@@ -12,14 +12,15 @@ import { ZodError } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
-  // Health check endpoint for Restack.io
+  // Enhanced health check endpoints for Restack.io compatibility
   app.get("/health", (req, res) => {
     res.status(200).json({
       status: "healthy",
       timestamp: new Date().toISOString(),
       service: "asphalt-tracker",
       version: "1.0.0",
-      uptime: process.uptime()
+      uptime: process.uptime(),
+      framework: "@restackio/ai"
     });
   });
 
@@ -29,8 +30,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timestamp: new Date().toISOString(),
       service: "asphalt-tracker-api",
       version: "1.0.0",
-      uptime: process.uptime()
+      uptime: process.uptime(),
+      framework: "@restackio/ai",
+      environment: process.env.NODE_ENV || "development"
     });
+  });
+
+  // Restack AI workflow management endpoints
+  app.post("/api/restack/workflows/truck-monitoring", async (req, res) => {
+    try {
+      const { restackService } = await import("../src/services/restackService.js");
+      const { truckId, driverId, monitoringDuration, alertThresholds } = req.body;
+      
+      const workflowId = await restackService.startTruckMonitoring({
+        truckId,
+        driverId,
+        monitoringDuration,
+        alertThresholds
+      });
+      
+      res.json({
+        success: true,
+        workflowId,
+        message: `Started truck monitoring workflow for Truck ${truckId}`
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.get("/api/restack/status", async (req, res) => {
+    try {
+      const { restackService } = await import("../src/services/restackService.js");
+      const healthStatus = restackService.getHealthStatus();
+      
+      res.json({
+        success: true,
+        restack: healthStatus,
+        message: "Restack AI service status"
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
   });
   
   // WebSocket server for real-time updates

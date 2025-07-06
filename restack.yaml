@@ -1,0 +1,335 @@
+# Restack AI Framework Deployment Configuration
+# AsphaltTracker Logistics Management Platform
+
+name: asphalt-tracker
+version: "1.0.0"
+
+# Application configuration
+app:
+  name: asphalt-tracker
+  description: "AI-powered logistics management platform with real-time monitoring"
+  framework: "@restackio/ai"
+  runtime: "nodejs"
+  
+# Build configuration
+build:
+  dockerfile: Dockerfile
+  context: .
+  buildArgs:
+    NODE_ENV: production
+  
+# Service definitions
+services:
+  # Main application service
+  app:
+    build: .
+    port: 5000
+    healthCheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    # Environment variables
+    env:
+      NODE_ENV: production
+      PORT: 5000
+      HOST: "0.0.0.0"
+      RESTACK_ENGINE_ADDRESS: "${RESTACK_ENGINE_ADDRESS}"
+      DATABASE_URL: "${DATABASE_URL}"
+      REDIS_URL: "${REDIS_URL}"
+      SESSION_SECRET: "${SESSION_SECRET}"
+      JWT_SECRET: "${JWT_SECRET}"
+    
+    # Resource allocation
+    resources:
+      cpu: 1000m
+      memory: 2Gi
+      storage: 10Gi
+    
+    # Auto-scaling configuration
+    scaling:
+      min: 1
+      max: 3
+      targetCPU: 70
+      targetMemory: 80
+    
+    # Restack AI Framework specific configuration
+    restack:
+      workflows:
+        - truckMonitoringWorkflow
+        - gpsTrackingWorkflow
+        - incidentManagementWorkflow
+        - batchTruckMonitoringWorkflow
+        - fleetGpsTrackingWorkflow
+        - batchIncidentProcessingWorkflow
+        - continuousIncidentMonitoringWorkflow
+      
+      activities:
+        # Truck management activities
+        - getTruckStatus
+        - processGpsData
+        - analyzeDriverBehavior
+        - calculateKpiScore
+        - sendAlert
+        - updateDashboard
+        # GPS activities
+        - updateLocation
+        - checkGeofences
+        - calculateRoute
+        - detectSpeedViolations
+        - sendGeofenceAlert
+        - updateTrackingDashboard
+        - storeLocationHistory
+      
+      taskQueue: asphalt-tracker-queue
+      worker:
+        maxConcurrentWorkflows: 100
+        maxConcurrentActivities: 50
+
+# Database services
+databases:
+  # Main PostgreSQL database with PostGIS for geographic data
+  postgres:
+    engine: postgresql
+    version: "15"
+    extensions:
+      - postgis
+    storage: 50Gi
+    backup:
+      enabled: true
+      schedule: "0 2 * * *" # Daily at 2 AM
+      retention: "30d"
+    resources:
+      cpu: 500m
+      memory: 1Gi
+    env:
+      POSTGRES_DB: asphalt_tracker
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+  
+  # Redis for caching and session storage
+  redis:
+    engine: redis
+    version: "7"
+    storage: 5Gi
+    resources:
+      cpu: 250m
+      memory: 512Mi
+    config:
+      maxmemory-policy: allkeys-lru
+      save: "300 1"
+
+# Storage configuration
+storage:
+  # File storage for videos, images, and reports
+  files:
+    type: s3
+    size: 100Gi
+    buckets:
+      - uploads
+      - videos
+      - incident-evidence
+      - reports
+      - backups
+    lifecycle:
+      - name: cleanup-temp
+        enabled: true
+        expiration: 1d
+        prefix: "temp/"
+      - name: archive-old-videos
+        enabled: true
+        transition: 90d
+        storageClass: IA
+
+# Networking and security
+network:
+  # Public endpoints
+  ingress:
+    - host: "${APP_DOMAIN}"
+      service: app
+      port: 5000
+      tls: true
+  
+  # Internal service communication
+  internal:
+    - from: app
+      to: postgres
+      ports: [5432]
+    - from: app
+      to: redis
+      ports: [6379]
+
+# Security configuration
+security:
+  # SSL/TLS configuration
+  tls:
+    enabled: true
+    autoGenerate: true
+  
+  # Network security
+  network:
+    allowedIPs: []
+    blockPrivateIPs: false
+  
+  # Secrets management
+  secrets:
+    - DATABASE_URL
+    - REDIS_URL
+    - SESSION_SECRET
+    - JWT_SECRET
+    - RESTACK_ENGINE_ADDRESS
+
+# Monitoring and observability
+monitoring:
+  # Health checks
+  health:
+    enabled: true
+    endpoints:
+      - path: /health
+        service: app
+      - path: /api/health
+        service: app
+  
+  # Metrics collection
+  metrics:
+    enabled: true
+    prometheus: true
+    interval: 30s
+  
+  # Logging configuration
+  logging:
+    level: info
+    format: json
+    retention: "7d"
+  
+  # Alerts
+  alerts:
+    - name: high-cpu
+      condition: cpu > 80
+      duration: 5m
+      severity: warning
+    - name: high-memory
+      condition: memory > 90
+      duration: 3m
+      severity: critical
+    - name: service-down
+      condition: health_check_failed
+      duration: 1m
+      severity: critical
+
+# Cost optimization
+cost:
+  # Scheduled scaling for business hours
+  schedules:
+    - name: business-hours-scale-up
+      cron: "0 8 * * 1-5"  # Monday-Friday 8 AM
+      action: scale
+      target: app
+      replicas: 2
+    - name: after-hours-scale-down
+      cron: "0 18 * * 1-5" # Monday-Friday 6 PM
+      action: scale
+      target: app
+      replicas: 1
+  
+  # Resource optimization
+  optimization:
+    autoShutdown: false
+    rightSizing: true
+    spotInstances: false # Keep false for production reliability
+
+# Backup and disaster recovery
+backup:
+  # Database backups
+  databases:
+    enabled: true
+    schedule: "0 3 * * *" # Daily at 3 AM
+    retention: "30d"
+    compression: true
+  
+  # File storage backups
+  storage:
+    enabled: true
+    schedule: "0 4 * * 0" # Weekly on Sunday at 4 AM
+    retention: "12w"
+    crossRegion: true
+
+# CI/CD integration
+cicd:
+  # Git integration
+  git:
+    provider: github
+    repository: "khiwniti/computer-vision-mlops"
+    branch: main
+    path: AsphaltTracker
+  
+  # Deployment triggers
+  triggers:
+    - on: push
+      branch: main
+      autoDeployment: true
+    - on: tag
+      pattern: "v*"
+      environment: production
+  
+  # Deployment strategy
+  deployment:
+    strategy: rolling
+    maxUnavailable: 0
+    maxSurge: 1
+
+# Environment-specific overrides
+environments:
+  # Development environment
+  development:
+    app:
+      resources:
+        cpu: 500m
+        memory: 1Gi
+      scaling:
+        min: 1
+        max: 1
+    databases:
+      postgres:
+        storage: 10Gi
+      redis:
+        storage: 1Gi
+    monitoring:
+      logging:
+        level: debug
+  
+  # Staging environment
+  staging:
+    app:
+      resources:
+        cpu: 750m
+        memory: 1.5Gi
+      scaling:
+        min: 1
+        max: 2
+    databases:
+      postgres:
+        storage: 25Gi
+      redis:
+        storage: 2.5Gi
+  
+  # Production environment (uses defaults above)
+  production: {}
+
+# Feature flags
+features:
+  # AI/ML features
+  aiAnalysis: true
+  realTimeProcessing: true
+  predictiveAnalytics: true
+  
+  # Integration features
+  multiVendorSupport: true
+  streamingDashboard: true
+  geofencing: true
+  
+  # Advanced features
+  autoScaling: true
+  dataEncryption: true
+  auditLogging: true

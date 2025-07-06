@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./database";
+import { restackService } from "../src/services/restackService.js";
 
 const app = express();
 
@@ -67,6 +68,15 @@ app.use((req, res, next) => {
   // Initialize database before starting server
   await initializeDatabase();
   
+  // Initialize Restack AI service
+  try {
+    await restackService.initialize();
+    log(`✅ Restack AI service initialized`);
+  } catch (error) {
+    log(`⚠️ Restack AI service initialization failed: ${error.message}`);
+    log(`📝 App will continue without Restack AI features`);
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -97,5 +107,19 @@ app.use((req, res, next) => {
     log(`🚀 AsphaltTracker serving on ${host}:${port}`);
     log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     log(`🔗 Health check: http://${host}:${port}/health`);
+    log(`🤖 Restack AI: ${restackService.getHealthStatus().initialized ? 'Enabled' : 'Disabled'}`);
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    log('🛑 SIGTERM received, shutting down gracefully...');
+    await restackService.shutdown();
+    process.exit(0);
+  });
+
+  process.on('SIGINT', async () => {
+    log('🛑 SIGINT received, shutting down gracefully...');
+    await restackService.shutdown();
+    process.exit(0);
   });
 })();

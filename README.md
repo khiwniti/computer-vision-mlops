@@ -140,4 +140,39 @@ AsphaltTracker/
 └── README.md       # This file
 ```
 
-The application is production-ready with all React errors fixed and comprehensive mock data system implemented.
+The application is production-ready with all React errors fixed, comprehensive mock data system implemented, and **full Restack AI framework integration**.
+
+## 🤖 Restack AI Framework Integration
+
+AsphaltTracker now uses the **Restack AI framework** (`@restackio/ai`) for workflow orchestration and activity management:
+
+### ✅ Restack Features Implemented
+- **Workflows**: Truck monitoring, GPS tracking, incident management
+- **Activities**: 12+ activities for logistics operations 
+- **Configuration**: Complete `restack.config.ts` and `restack.yaml`
+- **Service Integration**: Seamless integration with existing Express.js API
+- **Health Checks**: Restack-aware health endpoints for cloud deployment
+
+### 🔧 Restack Commands
+```bash
+# Validate Restack integration
+npm run restack:validate
+
+# Check Restack service status  
+npm run restack:check
+
+# Test complete Restack compatibility
+npm run test:restack
+```
+
+### 🚀 Restack Workflows Available
+- `truckMonitoringWorkflow` - Real-time truck monitoring
+- `gpsTrackingWorkflow` - GPS tracking with geofencing
+- `incidentManagementWorkflow` - AI-powered incident detection
+- `batchTruckMonitoringWorkflow` - Fleet-wide monitoring
+- `fleetGpsTrackingWorkflow` - Multi-truck GPS tracking
+
+### 📡 Restack API Endpoints
+- `POST /api/restack/workflows/truck-monitoring` - Start truck monitoring
+- `GET /api/restack/status` - Get Restack service status
+- `GET /health` - Enhanced health check with Restack info
