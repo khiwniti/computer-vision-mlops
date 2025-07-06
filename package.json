@@ -1,29 +1,55 @@
 {
   "name": "asphalt-tracker",
   "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
+  "private": true,
+  "description": "Real-time Computer Vision MLOps for Multi-Source CCTV Object Detection",
+  "main": "index.js",
+  "workspaces": [
+    "AsphaltTracker",
+    "frontend"
+  ],
   "scripts": {
-    "dev": "cross-env NODE_ENV=development node --import tsx/esm server/index.ts",
-    "dev:tsx": "cross-env NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --target=node18",
-    "start": "cross-env NODE_ENV=production node dist/index.js",
-    "start:dev": "cross-env NODE_ENV=development node --import tsx/esm server/index.ts",
-    "check": "tsc",
-    "db:push": "drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate",
-    "health": "curl -f http://localhost:5000/health || exit 1",
-    "mock:populate": "curl -s -X POST http://localhost:5000/api/mock/populate/quick",
-    "mock:simulate": "curl -s -X POST http://localhost:5000/api/mock/simulation/start",
-    "mock:status": "curl -s http://localhost:5000/api/mock/status",
-    "streaming:health": "curl -s http://localhost:5000/api/streams/health",
-    "streaming:status": "curl -s http://localhost:5000/api/streams/status",
-    "streaming:init": "curl -s -X POST http://localhost:5000/api/streams/initialize",
-    "restack:check": "curl -s http://localhost:5000/api/restack/status",
-    "restack:health": "curl -f http://localhost:5000/health | grep '@restackio/ai' || exit 1",
-    "restack:validate": "node -e 'console.log(\"✅ Restack AI dependency found:\", require(\"./package.json\").dependencies[\"@restackio/ai\"])'",
-    "test:restack": "npm run restack:validate && npm run health && npm run restack:check"
+    "deploy": "bash scripts/deploy-restack.sh",
+    "deploy:staging": "bash scripts/deploy-restack.sh --config restack.staging.yaml",
+    "validate": "restack validate restack.yaml",
+    "status": "restack status",
+    "logs": "restack logs",
+    "dev": "turbo run dev --parallel",
+    "dev:apps": "turbo run dev --filter=AsphaltTracker --filter=frontend --parallel",
+    "dev:docker": "docker-compose -f compose/infrastructure.yml -f compose/applications.yml up -d",
+    "dev:down": "docker-compose -f compose/infrastructure.yml -f compose/applications.yml down",
+    "build": "turbo run build",
+    "start": "turbo run start --parallel",
+    "test": "turbo run test",
+    "test:services": "pytest services/*/tests/",
+    "test:integration": "pytest tests/integration/",
+    "lint": "turbo run lint",
+    "format": "black services/",
+    "docs:build": "mkdocs build",
+    "docs:serve": "mkdocs serve",
+    "backup": "restack job run database-backup",
+    "restore": "bash scripts/restore-backup.sh",
+    "scale:up": "restack scale --service frigate --instances 2",
+    "scale:down": "restack scale --service frigate --instances 1",
+    "setup:local": "bash scripts/setup-local-dev.sh",
+    "cleanup": "restack job run video-cleanup"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/computer-vision-mlops.git"
+  },
+  "keywords": [
+    "computer-vision",
+    "mlops",
+    "cctv",
+    "object-detection",
+    "frigate",
+    "restack",
+    "open-source"
+  ],
+  "author": "Your Engineering Team",
+  "license": "MIT",
+
   "dependencies": {
     "@restackio/ai": "^0.0.126",
     "@hookform/resolvers": "^3.10.0",
@@ -107,10 +133,27 @@
     "drizzle-kit": "^0.30.4",
     "esbuild": "^0.25.0",
     "esbuild-wasm": "^0.25.0",
+    "eslint": "^8.55.0",
     "postcss": "^8.4.47",
+    "prettier": "^3.1.0",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.1",
+    "turbo": "^1.13.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.19"
-  }
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "restack": {
+    "config": "restack.yaml",
+    "project": "asphalt-cctv-mlops",
+    "environments": {
+      "production": "restack.yaml",
+      "staging": "restack.staging.yaml",
+      "development": "restack.dev.yaml"
+    }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

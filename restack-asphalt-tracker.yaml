@@ -1,0 +1,338 @@
+# Restack.io Service Configuration for AsphaltTracker
+# Computer Vision MLOps - AsphaltTracker Dashboard Service
+
+apiVersion: restack.io/v1
+kind: Stack
+metadata:
+  name: asphalt-tracker
+  description: "Real-time logistics management dashboard with CCTV monitoring and AI analytics"
+  version: "1.0.0"
+  labels:
+    environment: production
+    project: asphalt-tracker
+    owner: engineering
+
+spec:
+  # Global configuration
+  config:
+    region: us-east-1
+    auto_deploy: true
+    monitoring_enabled: true
+    backup_enabled: true
+    
+  # Environment variables
+  environment:
+    global:
+      TZ: UTC
+      NODE_ENV: production
+      LOG_LEVEL: INFO
+      MAX_CAMERA_STREAMS: "400"
+      ENABLE_REAL_TIME_ALERTS: "true"
+      ENABLE_ANALYTICS: "true"
+      DEBUG_MODE: "false"
+
+  # Database services
+  databases:
+    # PostgreSQL for application data
+    - name: postgres-main
+      type: postgresql
+      version: "15"
+      extensions:
+        - postgis
+        - postgis_topology
+      config:
+        database: asphalt_tracker
+        username: tracker_user
+        password: 
+          from_secret: postgres_password
+        max_connections: 100
+        shared_buffers: 128MB
+        effective_cache_size: 512MB
+      storage:
+        size: 50GB
+        type: ssd
+      backup:
+        enabled: true
+        retention_days: 30
+        schedule: "0 2 * * *"
+
+    # Redis cache for sessions and real-time data
+    - name: redis-cache
+      type: redis
+      version: "7"
+      config:
+        maxmemory: 1GB
+        maxmemory_policy: allkeys-lru
+        persistence: true
+        appendonly: true
+      storage:
+        size: 5GB
+        type: ssd
+
+  # Object storage for uploads and media
+  storage:
+    - name: app-storage
+      type: s3_compatible
+      config:
+        provider: minio
+        buckets:
+          - uploads
+          - videos
+          - backups
+          - analytics-data
+        access_policy: private
+        lifecycle_rules:
+          - name: temp_file_cleanup
+            days: 1
+            action: delete
+          - name: backup_retention
+            days: 30
+            action: delete
+      storage:
+        size: 100GB
+        type: standard
+
+  # Web services
+  services:
+    # AsphaltTracker Main Application
+    - name: asphalt-tracker
+      type: web
+      runtime: docker
+      dockerfile: ./Dockerfile
+      source:
+        repository: https://github.com/khiwniti/computer-vision-mlops.git
+        branch: main
+        path: ./AsphaltTracker
+      build:
+        context: ./
+        dockerfile: Dockerfile
+      config:
+        port: 5000
+        health_check: /health
+        instances:
+          min: 1
+          max: 3
+        scaling:
+          cpu_threshold: 70
+          memory_threshold: 80
+        resources:
+          cpu: 1000m
+          memory: 2Gi
+      environment:
+        DATABASE_URL:
+          from_database: postgres-main
+        REDIS_URL:
+          from_database: redis-cache
+        STORAGE_URL:
+          from_storage: app-storage
+        PORT: "5000"
+        HOST: "0.0.0.0"
+        NODE_ENV: "production"
+        SESSION_SECRET:
+          from_secret: session_secret
+        JWT_SECRET:
+          from_secret: jwt_secret
+      domains:
+        - name: asphalt-tracker.restack.app
+          ssl: true
+      routes:
+        - path: /*
+          method: "*"
+
+    # Real-time WebSocket Service (if needed separately)
+    - name: websocket-server
+      type: worker
+      runtime: docker
+      dockerfile: ./Dockerfile
+      source:
+        repository: https://github.com/khiwniti/computer-vision-mlops.git
+        branch: main
+        path: ./AsphaltTracker
+      config:
+        instances:
+          min: 1
+          max: 2
+        resources:
+          cpu: 500m
+          memory: 1Gi
+      environment:
+        DATABASE_URL:
+          from_database: postgres-main
+        REDIS_URL:
+          from_database: redis-cache
+        NODE_ENV: "production"
+        WS_PORT: "3001"
+
+  # Scheduled jobs
+  jobs:
+    # Database backup
+    - name: database-backup
+      type: cron
+      schedule: "0 2 * * *"  # Daily at 2 AM
+      runtime: docker
+      dockerfile: ./Dockerfile
+      source:
+        repository: https://github.com/khiwniti/computer-vision-mlops.git
+        branch: main
+        path: ./AsphaltTracker
+      resources:
+        cpu: 500m
+        memory: 1Gi
+      environment:
+        DATABASE_URL:
+          from_database: postgres-main
+        STORAGE_URL:
+          from_storage: app-storage
+        BACKUP_BUCKET: backups
+
+    # Analytics data processing
+    - name: analytics-processor
+      type: cron
+      schedule: "0 */6 * * *"  # Every 6 hours
+      runtime: docker
+      dockerfile: ./Dockerfile
+      source:
+        repository: https://github.com/khiwniti/computer-vision-mlops.git
+        branch: main
+        path: ./AsphaltTracker
+      resources:
+        cpu: 1000m
+        memory: 2Gi
+      environment:
+        DATABASE_URL:
+          from_database: postgres-main
+        REDIS_URL:
+          from_database: redis-cache
+        NODE_ENV: "production"
+
+    # System health check
+    - name: health-check
+      type: cron
+      schedule: "*/15 * * * *"  # Every 15 minutes
+      runtime: docker
+      dockerfile: ./Dockerfile
+      source:
+        repository: https://github.com/khiwniti/computer-vision-mlops.git
+        branch: main
+        path: ./AsphaltTracker
+      resources:
+        cpu: 100m
+        memory: 256Mi
+      environment:
+        HEALTH_CHECK_ENDPOINTS: "https://asphalt-tracker.restack.app/health"
+
+  # Secrets
+  secrets:
+    - name: postgres_password
+      generate: true
+      length: 32
+    - name: redis_password
+      generate: true
+      length: 32
+    - name: session_secret
+      generate: true
+      length: 64
+    - name: jwt_secret
+      generate: true
+      length: 64
+    - name: encryption_key
+      generate: true
+      length: 32
+
+  # Networking
+  networking:
+    vpc:
+      cidr: 10.0.0.0/16
+      enable_dns: true
+      enable_dns_hostnames: true
+    
+    subnets:
+      - name: public
+        cidr: 10.0.1.0/24
+        type: public
+      - name: private
+        cidr: 10.0.2.0/24
+        type: private
+      - name: database
+        cidr: 10.0.3.0/24
+        type: private
+
+    security_groups:
+      - name: web
+        ingress:
+          - port: 80
+            protocol: tcp
+            source: 0.0.0.0/0
+          - port: 443
+            protocol: tcp
+            source: 0.0.0.0/0
+          - port: 5000
+            protocol: tcp
+            source: 0.0.0.0/0
+      - name: database
+        ingress:
+          - port: 5432
+            protocol: tcp
+            source: 10.0.0.0/16
+          - port: 6379
+            protocol: tcp
+            source: 10.0.0.0/16
+
+  # Monitoring & alerting
+  monitoring:
+    enabled: true
+    retention_days: 30
+    alerts:
+      - name: high_cpu
+        condition: cpu_usage > 80
+        duration: 5m
+        severity: warning
+      - name: high_memory
+        condition: memory_usage > 85
+        duration: 5m
+        severity: warning
+      - name: service_down
+        condition: service_availability < 100
+        duration: 2m
+        severity: critical
+      - name: response_time
+        condition: response_time > 2000ms
+        duration: 5m
+        severity: warning
+
+  # Backup configuration
+  backup:
+    enabled: true
+    schedule: "0 3 * * *"  # Daily at 3 AM
+    retention:
+      daily: 7
+      weekly: 4
+      monthly: 3
+    encryption: true
+
+  # Auto-scaling configuration
+  autoscaling:
+    enabled: true
+    metrics:
+      - cpu_utilization
+      - memory_utilization
+      - request_rate
+    scale_up:
+      threshold: 70
+      cooldown: 300s
+    scale_down:
+      threshold: 30
+      cooldown: 600s
+
+  # Deployment configuration
+  deployment:
+    strategy: rolling_update
+    max_unavailable: 25%
+    max_surge: 25%
+    timeout: 600s
+    health_check:
+      enabled: true
+      initial_delay: 30s
+      period: 10s
+      timeout: 5s
+      failure_threshold: 3

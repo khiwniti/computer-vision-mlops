@@ -2,8 +2,8 @@
 // Monitors live camera feeds and tracks construction activities in real-time
 
 import { EventEmitter } from 'events';
-import WebSocket from 'ws';
-import { EnhancedVideoProcessor } from '../vss-integration/video-processor.js';
+import WebSocket, { WebSocketServer } from 'ws';
+import EnhancedVideoProcessor from '../vss-integration/video-processor.js';
 import { vssConfig } from '../vss-integration/vss-config.js';
 
 interface CameraStream {
@@ -55,7 +55,7 @@ export class RealTimeActivityTracker extends EventEmitter {
   private activityHistory: Map<string, ActivityEvent[]> = new Map();
   private safetyAlerts: SafetyAlert[] = [];
   private videoProcessor: EnhancedVideoProcessor;
-  private wsServer: WebSocket.Server;
+  private wsServer: WebSocketServer;
   private isProcessing: boolean = false;
   private processingInterval: NodeJS.Timeout | null = null;
 
@@ -70,7 +70,7 @@ export class RealTimeActivityTracker extends EventEmitter {
    * Initialize WebSocket server for real-time communication
    */
   private initializeWebSocketServer(port: number): void {
-    this.wsServer = new WebSocket.Server({ port });
+    this.wsServer = new WebSocketServer({ port });
     
     this.wsServer.on('connection', (ws: WebSocket) => {
       console.log('✅ Client connected to real-time activity tracker');

@@ -867,4 +867,5 @@ class EnhancedVideoProcessor extends EventEmitter {
   }
 }
 
-export default VideoProcessor;
+export default EnhancedVideoProcessor;
+export { EnhancedVideoProcessor as VideoProcessor };

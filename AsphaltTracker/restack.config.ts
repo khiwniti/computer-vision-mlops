@@ -8,9 +8,209 @@ export const config: RestackConfig = {
   appName: "asphalt-tracker",
   appVersion: "1.0.0",
   
+  // Infrastructure configuration for embedded services
+  infrastructure: {
+    // Embedded PostgreSQL Database
+    database: {
+      name: "AsphaltTracker Database",
+      type: "postgresql",
+      embedded: true,
+      config: {
+        host: "localhost",
+        port: 5432,
+        database: "asphalt_tracker",
+        username: "postgres",
+        password: process.env.DB_PASSWORD || "asphalt_tracker_2024",
+        maxConnections: 20,
+        ssl: false,
+        connectionTimeout: 30000,
+        idleTimeout: 600000
+      },
+      schema: {
+        autoMigrate: true,
+        migrationsPath: "./database/migrations",
+        seedsPath: "./database/seeds"
+      },
+      backup: {
+        enabled: true,
+        schedule: "0 2 * * *", // Daily at 2 AM
+        retention: "7d",
+        location: "./backups/database"
+      },
+      monitoring: {
+        enabled: true,
+        slowQueryThreshold: 1000,
+        connectionPoolMonitoring: true
+      }
+    },
+
+    // Embedded Redis Cache
+    redis: {
+      name: "AsphaltTracker Cache",
+      type: "redis",
+      embedded: true,
+      config: {
+        host: "localhost",
+        port: 6379,
+        password: process.env.REDIS_PASSWORD || "asphalt_redis_2024",
+        maxMemory: "1gb",
+        maxMemoryPolicy: "allkeys-lru",
+        databases: 16,
+        keyPrefix: "asphalt:",
+        commandTimeout: 5000
+      },
+      persistence: {
+        enabled: true,
+        strategy: "rdb",
+        savePoints: [
+          "900 1",   // Save if at least 1 key changed in 900 seconds
+          "300 10",  // Save if at least 10 keys changed in 300 seconds
+          "60 10000" // Save if at least 10000 keys changed in 60 seconds
+        ],
+        aofEnabled: true,
+        aofSyncPolicy: "everysec"
+      },
+      clustering: {
+        enabled: false,
+        nodes: 1
+      }
+    },
+
+    // Embedded Vector Database (ChromaDB)
+    vectorDatabase: {
+      name: "AsphaltTracker Vector DB",
+      type: "chromadb",
+      embedded: true,
+      config: {
+        host: "localhost",
+        port: 8000,
+        persistDirectory: "./data/chroma",
+        allowReset: false,
+        anonymizedTelemetry: false
+      },
+      collections: {
+        videoEmbeddings: {
+          name: "video_embeddings",
+          metadata: {"hnsw:space": "cosine"},
+          embeddingFunction: "nvidia/llama-3_2-nv-embedqa-1b-v2"
+        },
+        activityEmbeddings: {
+          name: "activity_embeddings",
+          metadata: {"hnsw:space": "cosine"},
+          embeddingFunction: "nvidia/llama-3_2-nv-embedqa-1b-v2"
+        },
+        safetyEmbeddings: {
+          name: "safety_embeddings",
+          metadata: {"hnsw:space": "cosine"},
+          embeddingFunction: "nvidia/llama-3_2-nv-embedqa-1b-v2"
+        }
+      }
+    },
+
+    // Embedded Time Series Database (InfluxDB)
+    timeSeriesDatabase: {
+      name: "AsphaltTracker Metrics DB",
+      type: "influxdb",
+      embedded: true,
+      config: {
+        host: "localhost",
+        port: 8086,
+        database: "asphalt_metrics",
+        username: "admin",
+        password: process.env.INFLUX_PASSWORD || "asphalt_influx_2024",
+        protocol: "http",
+        precision: "ms"
+      },
+      retention: {
+        policies: [
+          {
+            name: "realtime",
+            duration: "24h",
+            replication: 1,
+            default: true
+          },
+          {
+            name: "daily",
+            duration: "30d",
+            replication: 1,
+            default: false
+          },
+          {
+            name: "monthly",
+            duration: "365d",
+            replication: 1,
+            default: false
+          }
+        ]
+      },
+      measurements: [
+        "camera_metrics",
+        "processing_metrics",
+        "safety_metrics",
+        "activity_metrics",
+        "system_metrics"
+      ]
+    }
+  },
+
   // Enhanced service configuration with AI-powered video analytics
   services: {
-    // Core logistics service
+    // Enterprise Logistics Management Service
+    enterpriseLogistics: {
+      workflows: [
+        "dailyShipmentPlanningWorkflow",
+        "realTimeShipmentTrackingWorkflow",
+        "fleetOptimizationWorkflow",
+        "supplyChainAnalyticsWorkflow"
+      ],
+      activities: [
+        "createShipment",
+        "dispatchShipment",
+        "startTransportation",
+        "processGeofenceEvent",
+        "completeDelivery",
+        "getShipmentStatus",
+        "getPendingShipments",
+        "assessFleetAvailability",
+        "updateVehicleLocation",
+        "updateDriverHOS",
+        "analyzeFleetPerformance",
+        "optimizeRoute",
+        "optimizeMultiStopRoutes",
+        "createGeofence",
+        "checkGeofenceViolations",
+        "calculateRealTimeKPIs",
+        "generatePredictiveInsights",
+        "assessSupplyChainRisks",
+        "analyzeCustomerPerformance",
+        "analyzeSustainabilityMetrics",
+        "generateDispatchPlan",
+        "autoDispatchShipments"
+      ],
+      dependencies: ["database", "redis", "timeSeriesDatabase", "vectorDatabase"],
+      dataStores: {
+        primary: "database",
+        cache: "redis",
+        metrics: "timeSeriesDatabase",
+        analytics: "vectorDatabase"
+      },
+      realTimeFeatures: {
+        shipmentTracking: true,
+        geofenceMonitoring: true,
+        fleetVisibility: true,
+        routeOptimization: true,
+        predictiveAnalytics: true
+      },
+      enterpriseFeatures: {
+        multiTenancy: true,
+        advancedReporting: true,
+        apiIntegration: true,
+        customWorkflows: true,
+        complianceMonitoring: true
+      }
+    },
+
+    // Core logistics service (legacy support)
     logistics: {
       workflows: [
         "truckMonitoringWorkflow",
@@ -27,7 +227,13 @@ export const config: RestackConfig = {
         "sendAlert",
         "updateLocation",
         "manageGeofence"
-      ]
+      ],
+      dependencies: ["database", "redis", "timeSeriesDatabase"],
+      dataStores: {
+        primary: "database",
+        cache: "redis",
+        metrics: "timeSeriesDatabase"
+      }
     },
 
     // Enhanced video processing service with NVIDIA VSS integration
@@ -54,7 +260,19 @@ export const config: RestackConfig = {
         "checkImmediateSafety",
         "sendRealtimeAlerts",
         "updateActivityTracking"
-      ]
+      ],
+      dependencies: ["database", "redis", "vectorDatabase", "timeSeriesDatabase"],
+      dataStores: {
+        primary: "database",
+        cache: "redis",
+        embeddings: "vectorDatabase",
+        metrics: "timeSeriesDatabase"
+      },
+      aiIntegration: {
+        nvidiaVSS: true,
+        models: ["nvidia/vila", "meta/llama-3.1-70b-instruct", "nvidia/llama-3_2-nv-embedqa-1b-v2"],
+        embeddingStorage: "vectorDatabase"
+      }
     },
 
     // Activity tracking and monitoring service
@@ -83,7 +301,18 @@ export const config: RestackConfig = {
         "checkImmediateIssues",
         "sendImmediateAlerts",
         "updateRealtimeMetrics"
-      ]
+      ],
+      dependencies: ["database", "redis", "timeSeriesDatabase"],
+      dataStores: {
+        primary: "database",
+        cache: "redis",
+        metrics: "timeSeriesDatabase"
+      },
+      realTimeProcessing: {
+        enabled: true,
+        batchSize: 100,
+        processingInterval: "10s"
+      }
     },
 
     // Alert management service
