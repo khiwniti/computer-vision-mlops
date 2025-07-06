@@ -1,8 +1,6 @@
 // Truck Management Activities - Restack AI Framework integration
 // Wraps existing AsphaltTracker API functionality as Restack activities
 
-import { activity } from "@restackio/ai";
-
 // Types
 interface TruckStatus {
   truckId: number;
@@ -48,12 +46,12 @@ interface BehaviorAnalysis {
 }
 
 // Activity: Get Truck Status
-export const getTruckStatus = activity("getTruckStatus", async (params: {
+export async function getTruckStatus(params: {
   truckId: number;
   includeLocation?: boolean;
   includeCameras?: boolean;
   includeDriver?: boolean;
-}): Promise<TruckStatus> => {
+}): Promise<TruckStatus> {
   const { truckId, includeLocation = true, includeCameras = true, includeDriver = true } = params;
   
   console.log(`🚛 Getting status for Truck ${truckId}`);
@@ -114,17 +112,17 @@ export const getTruckStatus = activity("getTruckStatus", async (params: {
       lastUpdate: new Date()
     };
   }
-});
+}
 
 // Activity: Process GPS Data
-export const processGpsData = activity("processGpsData", async (params: {
+export async function processGpsData(params: {
   truckId: number;
   location: { latitude: number; longitude: number };
   speed: number;
   heading: number;
   checkGeofences?: boolean;
   speedLimit?: number;
-}): Promise<GpsData> => {
+}): Promise<GpsData> {
   const { truckId, location, speed, heading, checkGeofences = true, speedLimit = 65 } = params;
   
   console.log(`📍 Processing GPS data for Truck ${truckId} at ${location.latitude}, ${location.longitude}`);

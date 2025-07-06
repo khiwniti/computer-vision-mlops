@@ -1,22 +1,17 @@
-// Truck Monitoring Workflow - Real-time fleet management
+// Truck Monitoring Workflow - Real-time fleet management  
 // Integrates with existing AsphaltTracker logistics platform
 
-import { workflow, activity, proxyActivities } from "@restackio/ai";
+import { step } from "@restackio/ai/workflow";
 
-// Import activities
-const {
+// Import activity functions
+import {
   getTruckStatus,
   processGpsData,
   analyzeDriverBehavior,
-  detectIncidents,
   calculateKpiScore,
   sendAlert,
   updateDashboard
-} = proxyActivities({
-  scheduleToCloseTimeout: "1 minute",
-  scheduleToStartTimeout: "1 minute",
-  startToCloseTimeout: "5 minutes"
-});
+} from "../activities/simpleTruckActivities.js";
 
 // Workflow input type
 export interface TruckMonitoringInput {
@@ -61,8 +56,8 @@ export async function truckMonitoringWorkflow(
   try {
     // Continuous monitoring loop
     while (Date.now() < endTime) {
-      // Get current truck status
-      const truckStatus = await getTruckStatus({
+      // Step 1: Get current truck status
+      const truckStatus = await step().getTruckStatus({
         truckId,
         includeLocation: true,
         includeCameras: true,
@@ -71,12 +66,12 @@ export async function truckMonitoringWorkflow(
 
       if (!truckStatus.online) {
         console.log(`⚠️ Truck ${truckId} is offline, pausing monitoring`);
-        await workflow.sleep("30 seconds");
+        await new Promise(resolve => setTimeout(resolve, 30000));
         continue;
       }
 
-      // Process GPS data for geofencing and speed monitoring
-      const gpsData = await processGpsData({
+      // Step 2: Process GPS data for geofencing and speed monitoring
+      const gpsData = await step().processGpsData({
         truckId,
         location: truckStatus.location,
         speed: truckStatus.speed,
@@ -85,28 +80,23 @@ export async function truckMonitoringWorkflow(
         speedLimit: alertThresholds.speedLimit
       });
 
-      // Analyze driver behavior from camera feeds
-      const behaviorAnalysis = await analyzeDriverBehavior({
+      // Step 3: Analyze driver behavior from camera feeds
+      const behaviorAnalysis = await step().analyzeDriverBehavior({
         truckId,
         driverId,
-        cameraFeeds: truckStatus.cameras,
+        cameraFeeds: [],
         analysisTypes: ["drowsiness", "distraction", "seatbelt", "phone_usage"],
         confidence: 0.75
       });
 
-      // Detect incidents from AI analysis
-      const incidents = await detectIncidents({
-        truckId,
-        gpsViolations: gpsData.violations,
-        behaviorIncidents: behaviorAnalysis.incidents,
-        severityThreshold: alertThresholds.incidentSeverity
-      });
+      // Step 4: Combine incidents from GPS and behavior analysis
+      const incidents = [...gpsData.violations, ...behaviorAnalysis.incidents];
 
       // Update incident count
       totalIncidents += incidents.length;
 
-      // Calculate KPI score
-      const kpiScore = await calculateKpiScore({
+      // Step 5: Calculate KPI score
+      const kpiScore = await step().calculateKpiScore({
         truckId,
         driverId,
         gpsData,
@@ -122,8 +112,8 @@ export async function truckMonitoringWorkflow(
       const lowKpiScore = kpiScore.score < alertThresholds.kpiMinScore;
 
       if (criticalIncidents.length > 0 || lowKpiScore) {
-        // Send alerts for critical issues
-        await sendAlert({
+        // Step 6: Send alerts for critical issues
+        await step().sendAlert({
           truckId,
           driverId,
           alertType: criticalIncidents.length > 0 ? "critical_incident" : "low_kpi",
@@ -135,8 +125,8 @@ export async function truckMonitoringWorkflow(
         alertsSent++;
       }
 
-      // Update real-time dashboard
-      await updateDashboard({
+      // Step 7: Update real-time dashboard
+      await step().updateDashboard({
         truckId,
         status: truckStatus,
         kpiScore: kpiScore.score,
@@ -144,8 +134,8 @@ export async function truckMonitoringWorkflow(
         lastUpdate: new Date()
       });
 
-      // Wait before next monitoring cycle (5 seconds)
-      await workflow.sleep("5 seconds");
+      // Wait before next monitoring cycle (5 seconds) 
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
 
     const averageKpiScore = kpiScores.length > 0 

@@ -39,7 +39,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Restack AI workflow management endpoints
   app.post("/api/restack/workflows/truck-monitoring", async (req, res) => {
     try {
-      const { restackService } = await import("../src/services/restackService.js");
+      const { restackService } = await import("../src/services/simpleRestackService.js");
       const { truckId, driverId, monitoringDuration, alertThresholds } = req.body;
       
       const workflowId = await restackService.startTruckMonitoring({
@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/restack/status", async (req, res) => {
     try {
-      const { restackService } = await import("../src/services/restackService.js");
+      const { restackService } = await import("../src/services/simpleRestackService.js");
       const healthStatus = restackService.getHealthStatus();
       
       res.json({
