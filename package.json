@@ -25,7 +25,7 @@
     "test:restack": "npm run restack:validate && npm run health && npm run restack:check"
   },
   "dependencies": {
-    "@restackio/ai": "^0.2.0",
+    "@restackio/ai": "^0.0.126",
     "@hookform/resolvers": "^3.10.0",
     "@neondatabase/serverless": "^0.10.4",
     "@radix-ui/react-accordion": "^1.2.4",
