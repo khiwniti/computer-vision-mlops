@@ -134,5 +134,28 @@
     "tsx": "^4.19.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.19"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khiwniti/computer-vision-mlops.git",
+    "directory": "AsphaltTracker"
+  },
+  "homepage": "https://github.com/khiwniti/computer-vision-mlops#readme",
+  "bugs": {
+    "url": "https://github.com/khiwniti/computer-vision-mlops/issues"
+  },
+  "keywords": [
+    "asphalt-tracker",
+    "computer-vision",
+    "mlops",
+    "logistics",
+    "restack",
+    "ai"
+  ],
+  "author": "AsphaltTracker Team",
+  "private": true
 }

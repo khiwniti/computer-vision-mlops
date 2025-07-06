@@ -1,5 +1,5 @@
 # Enhanced Multi-stage build for AsphaltTracker Enterprise Logistics Platform
-FROM node:20-alpine AS base
+FROM node:18-alpine AS base
 
 # Install system dependencies for AI processing and video handling
 RUN apk add --no-cache \
@@ -16,19 +16,29 @@ RUN apk add --no-cache \
 FROM base AS deps
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
+# Copy package files and npm config
+COPY package.json package-lock.json* .npmrc ./
 
-# Clean install dependencies (avoid workspace conflicts)
-RUN npm install --only=production --no-workspaces && npm cache clean --force
+# Clean install production dependencies only
+RUN if [ -f package-lock.json ]; then \
+        npm ci --only=production --ignore-scripts && npm cache clean --force; \
+    else \
+        npm install --only=production --ignore-scripts && npm cache clean --force; \
+    fi
 
 # Build stage
 FROM base AS builder
 WORKDIR /app
 
-# Copy package files and install all dependencies (including dev)
-COPY package.json ./
-RUN npm install --no-workspaces
+# Copy package files and npm config
+COPY package.json package-lock.json* .npmrc ./
+
+# Install all dependencies for building
+RUN if [ -f package-lock.json ]; then \
+        npm ci --ignore-scripts; \
+    else \
+        npm install --ignore-scripts; \
+    fi
 
 # Copy source code
 COPY . .
@@ -50,8 +60,8 @@ ENV HOST=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 asphalt
 
-# Copy all dependencies (needed for external packages)
-COPY --from=builder --chown=asphalt:nodejs /app/node_modules ./node_modules
+# Copy production dependencies only
+COPY --from=deps --chown=asphalt:nodejs /app/node_modules ./node_modules
 
 # Copy built application
 COPY --from=builder --chown=asphalt:nodejs /app/dist ./dist
